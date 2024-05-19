@@ -1,0 +1,457 @@
+# Management Systems: Flight ticket reservation
+import pandas as pd
+import ipywidgets as widgets
+from IPython.display import display, clear_output
+from ipywidgets import VBox, DatePicker
+from geopy.distance import geodesic
+from abc import ABC, abstractmethod
+import json
+import unittest
+import datetime
+import pytz
+
+def singleton(cls): #singeltonas
+
+    instances = {}
+
+    def get_instance(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+    return get_instance
+
+@singleton #dekoratorius
+class God:
+
+    def __init__(self):
+        self._city=[]
+        self.__tiket=[] # Encapsulation
+
+    def add_city(self, city, platumos, ilgumos):
+        self._city.append({ "city": city, "platumos":platumos, "ilgumos":ilgumos})
+        with open("Flightsave.json", 'w') as f:
+            json.dump(self._city, f)
+
+    def load_city(self):
+        with open("Flightsave.json", 'r') as f:
+            self._city = json.load(f)
+
+    def add_tiket(self, miestas1, miestas2, asmuo, laikas2, atstumas, trukme, atvykimas):
+        self.__tiket.append({ "Išvikimo miestas": miestas1, "Atvikimo miestas":miestas2,"Asmuo":asmuo, "Išvikimo laikas":laikas2.strftime("%Y-%m-%d %H:%M"), "Atstumas":atstumas, "Trukme":trukme, "Atvimo laikas":atvykimas})
+        with open("Flighttiket.json", 'w') as f:
+            json.dump(self.__tiket, f)
+
+    def load_tiket(self, none):
+        with open("Flighttiket.json", 'r') as f:
+            self.__tiket = json.load(f)
+            print("Visos rezervacijos: ")
+            print(self.__tiket)
+
+    def get_tikets(self):
+        return self.__tiket
+
+    def reset(self):
+        self._city = []
+        self.__tiket = []
+
+class  Viskas(ABC): # ● Abstraction
+
+    @abstractmethod
+    def pradzia(self):
+       pass
+    @abstractmethod
+    def  toliau(self,b):
+        pass
+    @abstractmethod
+    def informacija(self, text, laikas, data2):
+       pass
+    @abstractmethod
+    def cia_kas(self, miestas1, miestas2, asmuo, laikas2, atstumas, trukme, atvykimas):
+       pass
+
+class Viskas2(Viskas): # ● Inheritance/paveldejimas
+
+     def pradzia(self):
+       clear_output()
+       global miesto_pasirinkimas1, miesto_pasirinkimas2
+       miesto_pasirinkimas1 = widgets.Dropdown(options=['Pasirinkti'] + cityname, description='Pasirinkite išvikimo miestą:', style={'description_width': '200px'})
+       miesto_pasirinkimas2 = widgets.Dropdown(options=['Pasirinkti'] + cityname, description='Pasirinkite atvikimo miestą:', style={'description_width': '200px'})
+       mygtukas = widgets.Button(description="Pasirinkti")
+       mygtukas.on_click(Pradedam.toliau)
+       miesto_pasirinkimas1.observe(patikrinsiu, names='value')
+       miesto_pasirinkimas2.observe(patikrinsiu, names='value')
+       display(miesto_pasirinkimas1)
+       display(miesto_pasirinkimas2)
+       display(mygtukas)
+       display(output)
+
+     def  toliau(self,b):
+        if miesto_pasirinkimas1.value == 'Pasirinkti' or miesto_pasirinkimas2.value == 'Pasirinkti':
+           return print("Pasirink miestus")
+        clear_output()
+        data2 = DatePicker(description="Pasirinkite datą:", style={'description_width': '200px'})
+        laikai = []
+        for valandos in range(24):
+            for minutes in range(0, 60, 30):
+                laikai.append(f"{valandos:02d}:{minutes:02d}")
+        laikas = widgets.Dropdown(options=['Pasirinkti'] + laikai, description='Pasirinkite išvikimo laika: ', style={'description_width': '200px'})
+        text = widgets.Text(description="Įveskite varda:", style={'description_width': '200px'})
+        mygtukas2 = widgets.Button(description="Pasirinkti")
+        v_box = VBox([data2,laikas, text, mygtukas2])
+        display(v_box)
+        mygtukas2.on_click(lambda b: dar_sitas.informacija(self, text,laikas,data2))
+
+     def informacija(self, text, laikas, data2):
+        pass
+
+     def cia_kas(self, miestas1, miestas2, asmuo, laikas2, atstumas, trukme, atvykimas):
+        pass
+
+class dar_sitas(Viskas):
+
+  def pradzia(self):
+        pass
+
+  def toliau(self, b):
+        pass
+
+  def  informacija(self,text,laikas,data2):
+    if data2.value == None:
+      return print("Nurodikite data")
+    laiko_juosta = pytz.timezone('Europe/Vilnius')
+    dabar=datetime.datetime.now()+datetime.timedelta(hours=3)
+    laikas2=datetime.datetime.strptime(f"{data2.value} {laikas.value}", "%Y-%m-%d %H:%M")
+    if laikas.value == 'Pasirinkti':
+         return print("Nurodikite laika")
+    elif dabar > laikas2:
+         return print("Jau pavėlavote. Išsirinkite kita laika.")
+    elif text.value == "":
+         return print("Ivekite VARDA")
+    clear_output()
+    print("Idėmiai patikrinkite informacija. Atšauti rezervacijos nebus galima!")
+    print("Iš:", miesto_pasirinkimas1.value, "į", miesto_pasirinkimas2.value)
+    atstumas = round(skaiciujaatstuma(miesto_pasirinkimas1.value, miesto_pasirinkimas2.value))
+    trukme =  round(skaiciujaatstuma(miesto_pasirinkimas1.value, miesto_pasirinkimas2.value)/100+0.5,2)
+    print("Atstumas ", atstumas, " km. ", "Kelionės trukmė: ", trukme,"val.")
+    atvykimas = (datetime.datetime.strptime(laikas.value, "%H:%M") + datetime.timedelta(hours=trukme)).strftime("%H:%M")
+    print("Išvikimo laikas: ", laikas.value," Planuojamas atvikimas: ",atvykimas)
+    print("Asmuo: ", text.value)
+    mygtukas3 = widgets.Button(description="REZERVUOTI")
+    display(mygtukas3)
+    mygtukas3.on_click(lambda b: dar_sitas.cia_kas(self,miesto_pasirinkimas1.value, miesto_pasirinkimas2.value,text.value, laikas2, atstumas, trukme, atvykimas))
+
+  def  cia_kas(self, miestas1, miestas2, asmuo, laikas2, atstumas, trukme, atvykimas):
+    clear_output()
+    Manager.add_tiket(miestas1, miestas2, asmuo, laikas2, atstumas, trukme, atvykimas)
+    print("Bilietas sėkmingai rezervuotas!")
+    print("Dabar galite peržiurėti rezervuotus bilietus arba rezevuoti nauja.")
+    mygtukasP = widgets.Button(description="Perziureti bilietus")
+    mygtukasR = widgets.Button(description="Rezervuoti nauja")
+    v_box = VBox([mygtukasP,mygtukasR])
+    display(v_box)
+    mygtukasP.on_click(Manager.load_tiket)
+    mygtukasR.on_click(isnaujo)
+
+
+def skaiciujaatstuma(city1, city2):
+    for _city in Manager._city:
+        if _city["city"] == city1:
+            platumos1, ilgumos1 = _city["platumos"], _city["ilgumos"]
+        elif _city["city"] == city2:
+            platumos2, ilgumos2 = _city["platumos"], _city["ilgumos"]
+    return geodesic((platumos1, ilgumos1), (platumos2, ilgumos2)).kilometers
+
+def isnaujo(self):
+    clear_output()
+    Pradedam.pradzia()
+
+def patikrinsiu(change):
+    if miesto_pasirinkimas1.value == miesto_pasirinkimas2.value and miesto_pasirinkimas1.value != 'Pasirinkti':
+        miesto_pasirinkimas2.value = 'Pasirinkti'
+    elif miesto_pasirinkimas2.value == miesto_pasirinkimas1.value and miesto_pasirinkimas2.value != 'Pasirinkti':
+        miesto_pasirinkimas1.value = 'Pasirinkti'
+
+output = widgets.Output()
+Manager=God()
+Manager2=God()
+Manager.add_city( "Vilnius", 54.6872, 25.2797)
+Manager.add_city( "Kaunas", 54.8985, 23.9036)
+Manager.add_city( "Klaipeda", 55.708313, 21.234931)
+Manager.add_city("Oslas", 59.925137, 10.746103)
+Manager.add_city("Varazdinas", 46.305135, 16.340054)
+Manager2.add_city( "Bukarestas", 44.406932, 26.078400)
+Manager2.add_city( "Lionas", 45.756456, 4.846395)
+Manager2.add_city( "Dublinas", 53.339658, -6.267733)
+Manager2.load_city()
+cityname = [c["city"] for c in Manager._city]
+Pradedam=Viskas2()
+
+
+class TestFlightManager(unittest.TestCase):
+    def setUp(self):
+        self.manager = God()
+        self.manager.reset()
+
+    def test_add_city(self):
+        self.manager.add_city("Vilnius", 54.6872, 25.2797)
+        self.assertEqual(len(self.manager._city), 1)
+        self.assertEqual(self.manager._city[0]["city"], "Vilnius")
+
+    def test_load_city(self):
+        self.manager.add_city("Vilnius", 54.6872, 25.2797)
+        self.manager.load_city()
+        self.assertEqual(len(self.manager._city), 1)
+
+    def test_add_tiket(self):
+        self.manager.add_city("Vilnius", 54.6872, 25.2797)
+        self.manager.add_city("Kaunas", 54.8985, 23.9036)
+        laikas2 = datetime.datetime(2024, 5, 20, 12, 0)
+        self.manager.add_tiket("Vilnius", "Kaunas", "Jonas", laikas2, 100, 1, "13:00")
+        self.assertEqual(len(self.manager.get_tikets()), 1)
+        self.assertEqual(self.manager.get_tikets()[0]["Asmuo"], "Jonas")
+
+    def test_load_tiket(self):
+        self.manager.add_city("Vilnius", 54.6872, 25.2797)
+        self.manager.add_city("Kaunas", 54.8985, 23.9036)
+        laikas2 = datetime.datetime(2024, 5, 20, 12, 0)
+        self.manager.add_tiket("Vilnius", "Kaunas", "Jonas", laikas2, 100, 1, "13:00")
+        self.manager.load_tiket(None)
+        self.assertEqual(len(self.manager.get_tikets()), 1)
+        self.assertEqual(self.manager.get_tikets()[0]["Asmuo"], "Jonas")
+        
+    def test_skaiciujaatstuma(self):
+        self.manager.add_city("Vilnius", 54.6872, 25.2797)
+        self.manager.add_city("Kaunas", 54.8985, 23.9036)
+        atstumas = skaiciujaatstuma("Vilnius", "Kaunas")
+        self.assertAlmostEqual(atstumas, 92, delta=1)
+
+Pradedam.pradzia()
+#unittest.main(argv=[''], verbosity=2, exit=False)# Management Systems: Flight ticket reservation
+import pandas as pd
+import ipywidgets as widgets
+from IPython.display import display, clear_output
+from ipywidgets import VBox, DatePicker
+from geopy.distance import geodesic
+from abc import ABC, abstractmethod
+import json
+import unittest
+import datetime
+import pytz
+
+def singleton(cls): #singeltonas
+
+    instances = {}
+
+    def get_instance(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+    return get_instance
+
+@singleton #dekoratorius
+class God:
+
+    def __init__(self):
+        self._city=[]
+        self.__tiket=[] # Encapsulation
+
+    def add_city(self, city, platumos, ilgumos):
+        self._city.append({ "city": city, "platumos":platumos, "ilgumos":ilgumos})
+        with open("Flightsave.json", 'w') as f:
+            json.dump(self._city, f)
+
+    def load_city(self):
+        with open("Flightsave.json", 'r') as f:
+            self._city = json.load(f)
+
+    def add_tiket(self, miestas1, miestas2, asmuo, laikas2, atstumas, trukme, atvykimas):
+        self.__tiket.append({ "Išvikimo miestas": miestas1, "Atvikimo miestas":miestas2,"Asmuo":asmuo, "Išvikimo laikas":laikas2.strftime("%Y-%m-%d %H:%M"), "Atstumas":atstumas, "Trukme":trukme, "Atvimo laikas":atvykimas})
+        with open("Flighttiket.json", 'w') as f:
+            json.dump(self.__tiket, f)
+
+    def load_tiket(self, none):
+        with open("Flighttiket.json", 'r') as f:
+            self.__tiket = json.load(f)
+            print("Visos rezervacijos: ")
+            print(self.__tiket)
+
+    def get_tikets(self):
+        return self.__tiket
+
+    def reset(self):
+        self._city = []
+        self.__tiket = []
+
+class  Viskas(ABC): # ● Abstraction
+
+    @abstractmethod
+    def pradzia(self):
+       pass
+    @abstractmethod
+    def  toliau(self,b):
+        pass
+    @abstractmethod
+    def informacija(self, text, laikas, data2):
+       pass
+    @abstractmethod
+    def cia_kas(self, miestas1, miestas2, asmuo, laikas2, atstumas, trukme, atvykimas):
+       pass
+
+class Viskas2(Viskas): # ● Inheritance/paveldejimas
+
+     def pradzia(self):
+       clear_output()
+       global miesto_pasirinkimas1, miesto_pasirinkimas2
+       miesto_pasirinkimas1 = widgets.Dropdown(options=['Pasirinkti'] + cityname, description='Pasirinkite išvikimo miestą:', style={'description_width': '200px'})
+       miesto_pasirinkimas2 = widgets.Dropdown(options=['Pasirinkti'] + cityname, description='Pasirinkite atvikimo miestą:', style={'description_width': '200px'})
+       mygtukas = widgets.Button(description="Pasirinkti")
+       mygtukas.on_click(Pradedam.toliau)
+       miesto_pasirinkimas1.observe(patikrinsiu, names='value')
+       miesto_pasirinkimas2.observe(patikrinsiu, names='value')
+       display(miesto_pasirinkimas1)
+       display(miesto_pasirinkimas2)
+       display(mygtukas)
+       display(output)
+
+     def  toliau(self,b):
+        if miesto_pasirinkimas1.value == 'Pasirinkti' or miesto_pasirinkimas2.value == 'Pasirinkti':
+           return print("Pasirink miestus")
+        clear_output()
+        data2 = DatePicker(description="Pasirinkite datą:", style={'description_width': '200px'})
+        laikai = []
+        for valandos in range(24):
+            for minutes in range(0, 60, 30):
+                laikai.append(f"{valandos:02d}:{minutes:02d}")
+        laikas = widgets.Dropdown(options=['Pasirinkti'] + laikai, description='Pasirinkite išvikimo laika: ', style={'description_width': '200px'})
+        text = widgets.Text(description="Įveskite varda:", style={'description_width': '200px'})
+        mygtukas2 = widgets.Button(description="Pasirinkti")
+        v_box = VBox([data2,laikas, text, mygtukas2])
+        display(v_box)
+        mygtukas2.on_click(lambda b: dar_sitas.informacija(self, text,laikas,data2))
+
+     def informacija(self, text, laikas, data2):
+        pass
+
+     def cia_kas(self, miestas1, miestas2, asmuo, laikas2, atstumas, trukme, atvykimas):
+        pass
+
+class dar_sitas(Viskas):
+
+  def pradzia(self):
+        pass
+
+  def toliau(self, b):
+        pass
+
+  def  informacija(self,text,laikas,data2):
+    if data2.value == None:
+      return print("Nurodikite data")
+    laiko_juosta = pytz.timezone('Europe/Vilnius')
+    dabar=datetime.datetime.now()+datetime.timedelta(hours=3)
+    laikas2=datetime.datetime.strptime(f"{data2.value} {laikas.value}", "%Y-%m-%d %H:%M")
+    if laikas.value == 'Pasirinkti':
+         return print("Nurodikite laika")
+    elif dabar > laikas2:
+         return print("Jau pavėlavote. Išsirinkite kita laika.")
+    elif text.value == "":
+         return print("Ivekite VARDA")
+    clear_output()
+    print("Idėmiai patikrinkite informacija. Atšauti rezervacijos nebus galima!")
+    print("Iš:", miesto_pasirinkimas1.value, "į", miesto_pasirinkimas2.value)
+    atstumas = round(skaiciujaatstuma(miesto_pasirinkimas1.value, miesto_pasirinkimas2.value))
+    trukme =  round(skaiciujaatstuma(miesto_pasirinkimas1.value, miesto_pasirinkimas2.value)/100+0.5,2)
+    print("Atstumas ", atstumas, " km. ", "Kelionės trukmė: ", trukme,"val.")
+    atvykimas = (datetime.datetime.strptime(laikas.value, "%H:%M") + datetime.timedelta(hours=trukme)).strftime("%H:%M")
+    print("Išvikimo laikas: ", laikas.value," Planuojamas atvikimas: ",atvykimas)
+    print("Asmuo: ", text.value)
+    mygtukas3 = widgets.Button(description="REZERVUOTI")
+    display(mygtukas3)
+    mygtukas3.on_click(lambda b: dar_sitas.cia_kas(self,miesto_pasirinkimas1.value, miesto_pasirinkimas2.value,text.value, laikas2, atstumas, trukme, atvykimas))
+
+  def  cia_kas(self, miestas1, miestas2, asmuo, laikas2, atstumas, trukme, atvykimas):
+    clear_output()
+    Manager.add_tiket(miestas1, miestas2, asmuo, laikas2, atstumas, trukme, atvykimas)
+    print("Bilietas sėkmingai rezervuotas!")
+    print("Dabar galite peržiurėti rezervuotus bilietus arba rezevuoti nauja.")
+    mygtukasP = widgets.Button(description="Perziureti bilietus")
+    mygtukasR = widgets.Button(description="Rezervuoti nauja")
+    v_box = VBox([mygtukasP,mygtukasR])
+    display(v_box)
+    mygtukasP.on_click(Manager.load_tiket)
+    mygtukasR.on_click(isnaujo)
+
+
+def skaiciujaatstuma(city1, city2):
+    for _city in Manager._city:
+        if _city["city"] == city1:
+            platumos1, ilgumos1 = _city["platumos"], _city["ilgumos"]
+        elif _city["city"] == city2:
+            platumos2, ilgumos2 = _city["platumos"], _city["ilgumos"]
+    return geodesic((platumos1, ilgumos1), (platumos2, ilgumos2)).kilometers
+
+def isnaujo(self):
+    clear_output()
+    Pradedam.pradzia()
+
+def patikrinsiu(change):
+    if miesto_pasirinkimas1.value == miesto_pasirinkimas2.value and miesto_pasirinkimas1.value != 'Pasirinkti':
+        miesto_pasirinkimas2.value = 'Pasirinkti'
+    elif miesto_pasirinkimas2.value == miesto_pasirinkimas1.value and miesto_pasirinkimas2.value != 'Pasirinkti':
+        miesto_pasirinkimas1.value = 'Pasirinkti'
+
+output = widgets.Output()
+Manager=God()
+Manager2=God()
+Manager.add_city( "Vilnius", 54.6872, 25.2797)
+Manager.add_city( "Kaunas", 54.8985, 23.9036)
+Manager.add_city( "Klaipeda", 55.708313, 21.234931)
+Manager.add_city("Oslas", 59.925137, 10.746103)
+Manager.add_city("Varazdinas", 46.305135, 16.340054)
+Manager2.add_city( "Bukarestas", 44.406932, 26.078400)
+Manager2.add_city( "Lionas", 45.756456, 4.846395)
+Manager2.add_city( "Dublinas", 53.339658, -6.267733)
+Manager2.load_city()
+cityname = [c["city"] for c in Manager._city]
+Pradedam=Viskas2()
+
+
+class TestFlightManager(unittest.TestCase):
+    def setUp(self):
+        self.manager = God()
+        self.manager.reset()
+
+    def test_add_city(self):
+        self.manager.add_city("Vilnius", 54.6872, 25.2797)
+        self.assertEqual(len(self.manager._city), 1)
+        self.assertEqual(self.manager._city[0]["city"], "Vilnius")
+
+    def test_load_city(self):
+        self.manager.add_city("Vilnius", 54.6872, 25.2797)
+        self.manager.load_city()
+        self.assertEqual(len(self.manager._city), 1)
+
+    def test_add_tiket(self):
+        self.manager.add_city("Vilnius", 54.6872, 25.2797)
+        self.manager.add_city("Kaunas", 54.8985, 23.9036)
+        laikas2 = datetime.datetime(2024, 5, 20, 12, 0)
+        self.manager.add_tiket("Vilnius", "Kaunas", "Jonas", laikas2, 100, 1, "13:00")
+        self.assertEqual(len(self.manager.get_tikets()), 1)
+        self.assertEqual(self.manager.get_tikets()[0]["Asmuo"], "Jonas")
+
+    def test_load_tiket(self):
+        self.manager.add_city("Vilnius", 54.6872, 25.2797)
+        self.manager.add_city("Kaunas", 54.8985, 23.9036)
+        laikas2 = datetime.datetime(2024, 5, 20, 12, 0)
+        self.manager.add_tiket("Vilnius", "Kaunas", "Jonas", laikas2, 100, 1, "13:00")
+        self.manager.load_tiket(None)
+        self.assertEqual(len(self.manager.get_tikets()), 1)
+        self.assertEqual(self.manager.get_tikets()[0]["Asmuo"], "Jonas")
+        
+    def test_skaiciujaatstuma(self):
+        self.manager.add_city("Vilnius", 54.6872, 25.2797)
+        self.manager.add_city("Kaunas", 54.8985, 23.9036)
+        atstumas = skaiciujaatstuma("Vilnius", "Kaunas")
+        self.assertAlmostEqual(atstumas, 92, delta=1)
+
+Pradedam.pradzia()
+#unittest.main(argv=[''], verbosity=2, exit=False)
